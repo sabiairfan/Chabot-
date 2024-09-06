@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chatbot</title>
+</head>
+
+
+<body>
+    <h1>Chat with me</h1>
+    <form method="post" action="{{ url_for('chatbot') }}" enctype="multipart/form-data">
+        <label for="message">Message:</label>
+        <input type="text" id="message" name="message" required>
+        <br>
+        <label for="file">Upload a file:</label>
+        <input type="file" id="file" name="file">
+        <br>
+        <button type="submit">Send</button>
+
+    </form>
+
+
+</body>
+</html>
