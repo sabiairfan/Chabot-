@@ -1,66 +1,49 @@
-from flask import Flask, render_template, request 
-
-import openai 
-import os 
-from dotenv import load_dotenv 
-
-load_dotenv()
-openai.api_key = os.environ["OPEN_AI_KEY"]
+from flask import Flask, render_template, request, jsonify
+from faster_whisper import WhisperModel
 
 app = Flask(__name__)
-
-UPLOAD_FOLDER = "static/uploads/"
-
 app.config["SECRET_KEY"] = "oauh"
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+model = WhisperModel("tiny")
+
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template("text_to_text.html")
 
-@app.route("/chatbot", methods=["POST"])
-def chatbot():
-    user_input = request.form.get("message")
-    
-    file = request.files.get('file')
+@app.route("/speech_to_text", methods=["POST"])
+def speech_to_text():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
 
-    file_content = ""
+    audio_file = request.files["file"]
+    audio_path = f"/tmp/{audio_file.filename}"
+    audio_file.save(audio_path)
 
-    if file:
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-        file.save(file_path)
+    segments, info = model.transcribe(audio_path)
+    transcript = " ".join([seg.text for seg in segments])
 
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                file_content = f.read()
-        except UnicodeDecodeError:
-        # Fallback to 'latin-1' encoding if 'utf-8' fails
-            with open(file_path, 'r', encoding='latin-1') as f:
-                file_content = f.read()
-    
-    file_content = file_content[:3000]
+    return jsonify({"transcript": transcript})
 
-    chat_history = []
+@app.route('/submit_reflection', methods=['POST'])
+def submit_reflection():
+    submitted = False
+    work_done = request.form.get('work', '')
+    hours_worked = request.form.get('hours', '0')
+    help_self = request.form.get('help', '')
+    future_impact = request.form.get('impact', '')
 
-    response = openai.ChatCompletion.create(  # <<< This line must be updated to:
-        model="gpt-3.5-turbo",  
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": user_input},
-            {"role": "system", "content": f"Here is some information from a file: {file_content}"},
-        ],
-        temperature=0.5,
-        max_tokens=60,
-        top_p=1,
-        frequency_penalty=0,
-        stop=["\nUser: ", "\nChatbot: "]
+    submitted = True
+
+    return render_template(
+        'text_to_text.html',
+        submitted=submitted,
+        work_done=work_done,
+        hours_worked=hours_worked,
+        help_self=help_self,
+        future_impact=future_impact
     )
 
-    bot_response = response.choices[0].message['content'].strip()
-
-    chat_history.append(f"User: {user_input}\nChatbot: {bot_response}")
-
-    return render_template("chatbot.html", user_input=user_input, bot_response=bot_response)
 
 
 if __name__ == '__main__':
